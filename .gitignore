@@ -1,0 +1,7 @@
+*.py[cod]
+
+# vscode
+.vscode
+
+data
+result
