@@ -265,7 +265,7 @@ class SEALDataset(InMemoryDataset):
         # filter num_nodes less than 100
         snapshots = list(filter(lambda s: s.number_of_nodes()>100, snapshots))
         snapshot = snapshots[self.pred_idx]
-        snapshot = from_networkx(snapshots)
+        snapshot = from_networkx(snapshot)
         
         transform = RandomLinkSplit(num_val=0.05, num_test=0.1, split_labels=True, neg_sampling_ratio=0.5)
         
