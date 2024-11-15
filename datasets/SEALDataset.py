@@ -257,11 +257,15 @@ class SEALDataset(InMemoryDataset):
         return [f'SEAL_T{self.T}_Id{self.pred_idx}_train_data.pt', f'SEAL_T{self.T}_Id{self.pred_idx}_val_data.pt', 
                 f'SEAL_T{self.T}_Id{self.pred_idx}_test_data.pt']
 
+    @property
+    def graph_data_file_name(self) -> str:
+        return f'{self.raw_dir}/{self.raw_file_names[0]}'
+    
     def download(self):
         download_url(f'{self.url}/{self.raw_file_names[0]}', self.raw_dir)
 
     def process(self):
-        snapshots = read_temporary_graph_data(f'{self.raw_dir}/{self.raw_file_names[0]}', self.raw_file_timespan, self.T)
+        snapshots = read_temporary_graph_data(self.graph_data_file_name, self.raw_file_timespan, self.T)
         # filter num_nodes less than 100
         snapshots = list(filter(lambda s: s.number_of_nodes()>100, snapshots))
         snapshot = snapshots[self.pred_idx]
