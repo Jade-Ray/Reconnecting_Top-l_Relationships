@@ -62,10 +62,17 @@ class SEALDatasetInMemory(InMemoryDataset):
             'timespan': 2613,},}
     
     def __init__(self, root: str, name: str, split: str = "train", 
-                 num_hops: int = 2, T: int = 100):
+                 num_hops: int = 2, T: int = 100, additional_graphs: List[nx.Graph] = None):
         self.name = name
         self.num_hop = num_hops
         self.T = T
+        if additional_graphs is not None:
+            if not isinstance(additional_graphs, list):
+                if isinstance(additional_graphs, nx.Graph):
+                    additional_graphs = [additional_graphs]
+                else:
+                    raise ValueError('additional_graphs must be a list of networkx.Graph or a networkx.Graph')
+        self.additional_graphs = additional_graphs
         
         super().__init__(root)
         index = ['train', 'val', 'test'].index(split)
@@ -88,9 +95,20 @@ class SEALDatasetInMemory(InMemoryDataset):
         return self.info[self.name]["timespan"]
     
     @property
+    def additional_graph_num(self) -> int:
+        return len(self.additional_graphs) if self.additional_graphs is not None else 0
+    
+    @property
     def processed_file_names(self) -> str:
-        return [f'SEAL_T{self.T}_train_data.pt', f'SEAL_T{self.T}_val_data.pt', 
-                f'SEAL_T{self.T}_test_data.pt']
+        if self.additional_graph_num == 0:
+            return [f'SEAL_T{self.T}_train_data.pt', 
+                    f'SEAL_T{self.T}_val_data.pt', 
+                    f'SEAL_T{self.T}_test_data.pt',]
+        else:
+            return [f'SEAL_T{self.T}+{self.additional_graph_num}_train_data.pt', 
+                    f'SEAL_T{self.T}+{self.additional_graph_num}_val_data.pt', 
+                    f'SEAL_T{self.T}+{self.additional_graph_num}_test_data.pt',]
+    
     @property
     def graph_data_file_name(self) -> str:
         return f'{self.raw_dir}/{self.raw_file_names[0]}'
@@ -100,6 +118,11 @@ class SEALDatasetInMemory(InMemoryDataset):
 
     def process(self):
         snapshots = read_temporary_graph_data(self.graph_data_file_name, self.raw_file_timespan, self.T)
+        # set `self.T` length sliding window for snapshots+additional_graphs
+        if self.additional_graphs is not None:
+            snapshots = snapshots[self.additional_graph_num:] + self.additional_graphs
+        assert len(snapshots) == self.T, f'snapshots length should be {self.T}, but got {len(snapshots)}'
+        
         # filter num_nodes less than 100
         snapshots = list(filter(lambda s: s.number_of_nodes()>100, snapshots))  
         snapshots = list(map(from_networkx, snapshots))
@@ -225,12 +248,20 @@ class SEALDataset(InMemoryDataset):
             'timespan': 2613,},}
     
     def __init__(self, root: str, name: str, split='train', pred_idx: int = -1, 
-                 num_hops: int = 2, T: int = 100, max_z :int = None):
+                 num_hops: int = 2, T: int = 100, max_z :int = None,
+                 additional_graphs: List[nx.Graph] = None):
         self.name = name
         self.num_hop = num_hops
         self.T = T
         self.pred_idx = pred_idx
         self._max_z = 0 if max_z is None else max_z
+        if additional_graphs is not None:
+            if not isinstance(additional_graphs, list):
+                if isinstance(additional_graphs, nx.Graph):
+                    additional_graphs = [additional_graphs]
+                else:
+                    raise ValueError('additional_graphs must be a list of networkx.Graph or a networkx.Graph')
+        self.additional_graphs = additional_graphs
         
         super().__init__(root)
         index = ['train', 'val', 'test'].index(split)
@@ -253,9 +284,21 @@ class SEALDataset(InMemoryDataset):
         return self.info[self.name]["timespan"]
     
     @property
+    def additional_graph_num(self) -> int:
+        return len(self.additional_graphs) if self.additional_graphs is not None else 0
+    
+    @property
     def processed_file_names(self) -> str:
-        return [f'SEAL_T{self.T}_Id{self.pred_idx}_train_data.pt', f'SEAL_T{self.T}_Id{self.pred_idx}_val_data.pt', 
-                f'SEAL_T{self.T}_Id{self.pred_idx}_test_data.pt']
+        if self.additional_graph_num == 0:
+            return [f'SEAL_T{self.T}_Id{self.pred_idx}_train_data.pt', 
+                    f'SEAL_T{self.T}_Id{self.pred_idx}_val_data.pt', 
+                    f'SEAL_T{self.T}_Id{self.pred_idx}_test_data.pt',]
+        else:
+            return [
+                f'SEAL_T{self.T}+{self.additional_graph_num}_Id{self.pred_idx}_train_data.pt', 
+                f'SEAL_T{self.T}+{self.additional_graph_num}_Id{self.pred_idx}_val_data.pt', 
+                f'SEAL_T{self.T}+{self.additional_graph_num}_Id{self.pred_idx}_test_data.pt',
+            ]
 
     @property
     def graph_data_file_name(self) -> str:
@@ -266,6 +309,11 @@ class SEALDataset(InMemoryDataset):
 
     def process(self):
         snapshots = read_temporary_graph_data(self.graph_data_file_name, self.raw_file_timespan, self.T)
+        # set `self.T` length sliding window for snapshots+additional_graphs
+        if self.additional_graphs is not None:
+            snapshots = snapshots[self.additional_graph_num:] + self.additional_graphs
+        assert len(snapshots) == self.T, f'snapshots length should be {self.T}, but got {len(snapshots)}'
+        
         # filter num_nodes less than 100
         snapshots = list(filter(lambda s: s.number_of_nodes()>100, snapshots))
         snapshot = snapshots[self.pred_idx]
